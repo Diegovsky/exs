@@ -6,9 +6,11 @@ use rand::Rng;
 use std::f64::consts::E;
 use std::time::Instant;
 
+pub type NodeList = Box<[Node]>;
+
 #[derive(Clone)]
 struct Solution<'g> {
-    pub nodes: Vec<Node>,
+    pub nodes: NodeList,
     pub value: Weight,
     graph: &'g dyn Graph,
 }
@@ -39,12 +41,17 @@ fn solution_value(solution: &[Node], g: &dyn Graph) -> Weight {
 }
 
 impl<'g> Solution<'g> {
-    pub fn new(nodes: Vec<Node>, graph: &'g dyn Graph) -> Self {
+    pub fn new(nodes: impl Into<Box<[Node]>>, graph: &'g dyn Graph) -> Self {
+        let nodes = nodes.into();
         Self {
-            value: solution_value(&nodes, graph),
-            nodes,
+            value: solution_value(&*nodes, graph),
+            nodes: nodes.into(),
             graph,
         }
+    }
+
+    pub fn sequential(g: &'g dyn Graph) -> Self {
+        Self::new((0..g.node_count() as Node).collect::<Box<[_]>>(), g)
     }
 
     pub fn random(graph: &'g dyn Graph) -> Self {
@@ -92,7 +99,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let epsilon = args.epsilon;
 
     // Solução inicial consiste em nós em órdem aleatória.
-    let mut s = Solution::random(&graph);
+    let mut s = Solution::sequential(&graph);
 
     let mut s_best = s.clone();
 
@@ -108,7 +115,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if s < s_best {
                     s_best = s.clone();
                 }
-            } else if rand.gen::<f64>() < E.powf(s.value as f64 - s_prime.value as f64 / temp) {
+            } else if rand.gen::<f64>() < E.powf((s.value as f64 - s_prime.value as f64) / temp) {
                 s = s_prime;
             }
         }
