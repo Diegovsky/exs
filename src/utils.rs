@@ -1,4 +1,5 @@
 use std::{
+    ffi::OsString,
     fs::File,
     io::{self, BufRead, BufReader},
 };
@@ -13,17 +14,20 @@ pub fn euclidean_distance(a: [Weight; 2], b: [Weight; 2]) -> Weight {
     d as Weight
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub enum Mode {
-    #[default]
-    First,
-    Best,
+#[derive(Debug)]
+pub struct Defaults {
+    pub i_max: usize,
+    pub epsilon: f64,
+    pub alpha: f64,
+    pub temp0: f64,
 }
 
 pub struct Args {
-    pub filename: String,
-    pub mode: Mode,
-    pub iter_steps: usize,
+    pub filename: OsString,
+    pub i_max: usize,
+    pub epsilon: f64,
+    pub alpha: f64,
+    pub temp0: f64,
 }
 
 impl Args {
@@ -31,33 +35,50 @@ impl Args {
         let file = File::open(&self.filename).expect("Falha ao abrir arquivo de entrada");
         BufReader::new(file)
     }
-    pub fn from_argv() -> Self {
-        let mut args: Vec<String> = std::env::args().skip(1).collect();
-        if args.is_empty() {
-            panic!("Esperava nome do aquivo de entrada");
+    pub fn from_argv(defaults: Defaults) -> Result<Self, lexopt::Error> {
+        use lexopt::prelude::*;
+
+        let mut parser = lexopt::Parser::from_env();
+        let mut filename = None;
+        let mut i_max = 10;
+        let mut epsilon: f64 = defaults.epsilon;
+        let mut alpha: f64 = defaults.alpha;
+        let mut temp0: f64 = defaults.temp0;
+
+        while let Some(arg) = parser.next()? {
+            match arg {
+                Value(fname) if filename.is_none() => {
+                    filename = Some(fname);
+                }
+                Value(inv) => {
+                    return Err(format!("Não esperava o argumento {:?}", inv))?;
+                }
+                Short('i') | Long("i-max") => i_max = parser.value()?.parse()?,
+                Short('e') | Long("epsilon") => epsilon = parser.value()?.parse()?,
+                Short('a') | Long("alpha") => alpha = parser.value()?.parse()?,
+                Short('t') | Long("temp0") => temp0 = parser.value()?.parse()?,
+                Short('h') | Long("help") => {
+                    eprintln!(
+                        include_str!("help.txt"),
+                        exe = parser.bin_name().unwrap(),
+                        i_max = i_max,
+                        epsilon = epsilon,
+                        temp0 = temp0,
+                        alpha = alpha,
+                    );
+                    std::process::exit(0);
+                }
+                _ => return Err(arg.unexpected()),
+            }
         }
-        let filename = args.remove(0);
 
-        let mode = args
-            .get(0)
-            .map(|arg| match arg.as_str() {
-                "first" => Mode::First,
-                "best" => Mode::Best,
-                _ => panic!("Modo inesperado: {arg}"),
-            })
-            .unwrap_or_default();
-
-        // Condição de parada: qntd de iterações
-        let iter_steps: usize = args
-            .get(1)
-            .map(|arg| arg.parse().expect("Esperava um número"))
-            .unwrap_or(10);
-
-        Self {
-            mode,
-            filename,
-            iter_steps,
-        }
+        Ok(Self {
+            filename: filename.ok_or("Esperava o nome do arquivo")?,
+            i_max,
+            alpha,
+            epsilon,
+            temp0,
+        })
     }
 }
 

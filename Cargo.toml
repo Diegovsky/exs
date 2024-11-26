@@ -5,4 +5,5 @@ edition = "2021"
 
 [dependencies]
 bitvec = "1.0.1"
+lexopt = "0.3.0"
 rand = "0.8.5"
