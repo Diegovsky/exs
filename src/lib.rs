@@ -2,6 +2,8 @@ use std::collections::{BTreeMap as Map, BTreeSet as Set};
 
 use rand::{random, Rng};
 
+pub mod cli;
+pub mod knapsack;
 pub mod utils;
 
 /// Nós são identificados pelo tipo `u32`, que é um inteiro de 32 bits positivo.

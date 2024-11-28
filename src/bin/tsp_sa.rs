@@ -1,13 +1,12 @@
 use core::f64;
-use exs::utils::{Args, Defaults};
+use exs::cli::tsp_sa::{Args, Defaults};
 use exs::{Graph, GraphMat, Node, Weight};
-use rand::seq::{IteratorRandom, SliceRandom};
+use rand::seq::SliceRandom;
 use rand::Rng;
 use std::f64::consts::E;
 use std::time::Instant;
 
 pub type NodeList = Box<[Node]>;
-
 #[derive(Clone)]
 struct Solution<'g> {
     pub nodes: NodeList,

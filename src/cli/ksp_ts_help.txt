@@ -3,12 +3,6 @@ Uso: {exe} <nome do arquivo>
 As seguintes opções valoradas são suportadas:
 	-i | --i-max   (padrão: {i_max})
 		Permite escolher a qntd max de iterações do SA
-	-e | --epsilon (padrão: {epsilon})
-		Permite escolher a precisão da temperatura ao checar se é 0.
-	-a | --alpha   (padrão: {alpha})
-		Permite escolher o valor alpha de resfriamento
-	-t | --telp    (padrão: {temp0})
-		Permite escolher o valor inicial de temperatura.
 
 As seguintes opções são suportadas:
 	-h | --help
