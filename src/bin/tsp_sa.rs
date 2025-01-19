@@ -1,9 +1,18 @@
-use exs::cli::tsp_sa::{Args, Params};
+use exs::cli::tsp_sa::{Args;
 use exs::tsp::Solution;
 use exs::{Graph, GraphMat, Weight};
 use rand::Rng;
 use std::f64::consts::E;
 use std::time::{Duration, Instant};
+
+#[derive(Debug)]
+pub struct Params {
+    pub i_max: usize,
+    pub epsilon: f64,
+    pub alpha: f64,
+    pub temp0: f64,
+    pub exponential_cooling: bool,
+}
 
 fn run(g: &dyn Graph, params: &Params) -> (Duration, Weight) {
     let mut temp = params.temp0;
@@ -45,14 +54,14 @@ fn run(g: &dyn Graph, params: &Params) -> (Duration, Weight) {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args = Args::from_argv(Params {
+    let args = Args::from_argv()?;
+    let params = Params {
         epsilon: 0.005,
         i_max: 10,
         temp0: 10.0,
         alpha: 0.9,
         exponential_cooling: false,
-    })?;
-    let params = &args.params;
+    };
     let temp0 = params.temp0;
 
     let i_max = params.i_max;

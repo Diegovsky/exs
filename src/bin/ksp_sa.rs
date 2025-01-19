@@ -1,16 +1,19 @@
 use std::time::Instant;
 
 use bitvec::prelude::*;
-use exs::{
-    cli::ksp_sa::{Args, PParams},
-    knapsack::{read_knapsack, Item, Params, Solution},
-};
+use exs::knapsack::{read_knapsack, Params, Solution};
+
+#[derive(Debug)]
+pub struct PParams {
+    pub i_max: usize,
+    pub penalty: usize,
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args = Args::from_argv(PParams {
+    let params = PParams {
         i_max: 100,
         penalty: 2,
-    })?;
+    ;
     let (maxw, items) = read_knapsack(&mut args.open_file())?;
     let items = &*items;
     let k = items.len();

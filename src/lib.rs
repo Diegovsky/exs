@@ -1,8 +1,9 @@
-use std::collections::{BTreeMap as Map, BTreeSet as Set};
+use std::{
+    collections::{BTreeMap as Map, BTreeSet as Set},
+    fs::File,
+    io::BufReader,
+};
 
-use rand::{random, Rng};
-
-pub mod cli;
 pub mod knapsack;
 pub mod tsp;
 pub mod utils;
@@ -211,4 +212,14 @@ pub fn print_edges(graph: &dyn Graph) {
         // Como os nós começam em 0, somamos 1 para ficar igual à entrada.
         println!("{} {} {}", edge.0 + 1, edge.1 + 1, edge.2);
     }
+}
+
+pub fn open_file() -> BufReader<File> {
+    let file = File::open(
+        std::env::args_os()
+            .nth(1)
+            .expect("Esperava nome do arquivo de entrada"),
+    )
+    .expect("Falha ao abrir arquivo de entrada");
+    BufReader::new(file)
 }
