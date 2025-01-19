@@ -3,6 +3,7 @@ Uso: {exe} <nome do arquivo>
 As seguintes opções valoradas são suportadas:
 	-i | --i-max   (padrão: {i_max})
 		Permite escolher a qntd max de iterações do SA
+	-
 
 As seguintes opções são suportadas:
 	-h | --help

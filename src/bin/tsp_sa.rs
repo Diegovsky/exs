@@ -1,104 +1,19 @@
-use core::f64;
-use exs::cli::tsp_sa::{Args, Defaults};
-use exs::{Graph, GraphMat, Node, Weight};
-use rand::seq::SliceRandom;
+use exs::cli::tsp_sa::{Args, Params};
+use exs::tsp::Solution;
+use exs::{Graph, GraphMat, Weight};
 use rand::Rng;
 use std::f64::consts::E;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
-pub type NodeList = Box<[Node]>;
-#[derive(Clone)]
-struct Solution<'g> {
-    pub nodes: NodeList,
-    pub value: Weight,
-    graph: &'g dyn Graph,
-}
+fn run(g: &dyn Graph, params: &Params) -> (Duration, Weight) {
+    let mut temp = params.temp0;
 
-// Implementa interfaces de comparação
-// Dessa forma, é possível realizar comparações entre soluções
-impl std::cmp::PartialEq for Solution<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        self.value.eq(&other.value)
-    }
-}
-
-impl std::cmp::PartialOrd for Solution<'_> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.value.partial_cmp(&other.value)
-    }
-}
-
-// Função de avaliação
-fn solution_value(solution: &[Node], g: &dyn Graph) -> Weight {
-    let first = *solution.first().unwrap();
-    let last = *solution.last().unwrap();
-    solution
-        .windows(2)
-        .map(|window| g.get_edge_weight(window[0], window[1]).unwrap())
-        .sum::<Weight>()
-        + g.get_edge_weight(last, first).unwrap()
-}
-
-impl<'g> Solution<'g> {
-    pub fn new(nodes: impl Into<Box<[Node]>>, graph: &'g dyn Graph) -> Self {
-        let nodes = nodes.into();
-        Self {
-            value: solution_value(&*nodes, graph),
-            nodes: nodes.into(),
-            graph,
-        }
-    }
-
-    pub fn sequential(g: &'g dyn Graph) -> Self {
-        Self::new((0..g.node_count() as Node).collect::<Box<[_]>>(), g)
-    }
-
-    pub fn random(graph: &'g dyn Graph) -> Self {
-        let k = graph.node_count() as Node;
-        let mut nodes: Vec<Node> = (0..k).collect();
-        nodes.shuffle(&mut rand::thread_rng());
-        Self::new(nodes, graph)
-    }
-
-    pub fn swap(&self, a: usize, b: usize) -> Self {
-        let mut nodes = self.nodes.clone();
-        nodes.swap(a, b);
-        Self::new(nodes, self.graph)
-    }
-
-    pub fn random_neighbour(&self, rand: &mut impl Rng) -> Self {
-        let span = 0..self.nodes.len();
-        let a = rand.gen_range(span.clone());
-        let mut b;
-        loop {
-            b = rand.gen_range(span.clone());
-            if b != a {
-                break;
-            }
-        }
-        self.swap(a, b)
-    }
-}
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args = Args::from_argv(Defaults {
-        epsilon: 0.005,
-        i_max: 10,
-        temp0: 10.0,
-        alpha: 0.9,
-    })?;
-    let mut file = args.open_file();
-    let mut graph = GraphMat::default();
-    exs::utils::fill_tsp_graph(&mut file, &mut graph)?;
-
-    let mut temp = args.temp0;
-
-    let i_max = args.i_max;
-    let alpha = args.alpha;
-    let epsilon = args.epsilon;
+    let i_max = params.i_max;
+    let alpha = params.alpha;
+    let epsilon = params.epsilon;
 
     // Solução inicial consiste em nós em órdem aleatória.
-    let mut s = Solution::sequential(&graph);
+    let mut s = Solution::sequential(g);
 
     let mut s_best = s.clone();
 
@@ -118,13 +33,40 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 s = s_prime;
             }
         }
-        temp *= alpha;
+        if params.exponential_cooling {
+            temp *= alpha;
+        } else {
+            temp -= alpha;
+        }
     }
-    println!(
-        "Solução final: {:?}\n\
-             Valor: {}",
-        s_best.nodes, s_best.value
-    );
-    println!("Tempo de execução: {:?}", now.elapsed());
+    let runtime = now.elapsed();
+
+    (runtime, s_best.value)
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args = Args::from_argv(Params {
+        epsilon: 0.005,
+        i_max: 10,
+        temp0: 10.0,
+        alpha: 0.9,
+        exponential_cooling: false,
+    })?;
+    let params = &args.params;
+    let temp0 = params.temp0;
+
+    let i_max = params.i_max;
+    let alpha = params.alpha;
+    let epsilon = params.epsilon;
+    println!("epsilon={epsilon}||i_max={i_max}||temp0={temp0}||alpha={alpha}");
+    let mut file = args.open_file();
+    let mut graph = GraphMat::default();
+    exs::utils::fill_tsp_graph(&mut file, &mut graph)?;
+
+    println!("runtime;cost");
+    for _ in 0..10 {
+        let (runtime, objective_func) = run(&graph, &params);
+        println!("{:?};{}", runtime.as_secs_f64(), objective_func);
+    }
     Ok(())
 }
