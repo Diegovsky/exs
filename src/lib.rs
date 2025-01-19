@@ -223,3 +223,17 @@ pub fn open_file() -> BufReader<File> {
     .expect("Falha ao abrir arquivo de entrada");
     BufReader::new(file)
 }
+
+use std::fmt::Debug;
+use std::io::Write;
+pub fn debug_to_kw(val: &dyn Debug) -> String {
+    let mut buf = Vec::new();
+    write!(&mut buf, "{val:#?}").unwrap();
+    let text = String::from_utf8(buf).unwrap();
+    let p = text.split("\n").map(|s| s.trim()).collect::<Vec<_>>();
+    p[1..p.len() - 1]
+        .join(";")
+        .replace(": ", "=")
+        .trim()
+        .replace(",", "")
+}

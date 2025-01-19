@@ -75,7 +75,7 @@ impl<'ks> Solution<'ks> {
     pub fn greedy(knapsack: &'ks [Item], params: Params) -> Self {
         let mut sorted = knapsack.iter().enumerate().collect::<Vec<_>>();
         // ordena por valor do ítem
-        sorted.sort_by_cached_key(|(i, item)| item.value);
+        sorted.sort_by_cached_key(|(_, item)| item.value);
         let mut solution = BitVec::new();
         while let Some((i, _)) = sorted.pop() {
             solution.set(i, true);
