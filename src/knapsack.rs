@@ -77,6 +77,7 @@ impl<'ks> Solution<'ks> {
         // ordena por valor do ítem
         sorted.sort_by_cached_key(|(_, item)| item.value);
         let mut solution = BitVec::new();
+        solution.resize(knapsack.len(), false);
         while let Some((i, _)) = sorted.pop() {
             solution.set(i, true);
             if evaluate_solution(&solution, knapsack, params) < 0 {

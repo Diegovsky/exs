@@ -3,10 +3,7 @@ use std::time::{Duration, Instant};
 
 use exs::debug_to_kw;
 use exs::knapsack::Item;
-use exs::knapsack::UWeight;
-use exs::knapsack::Weight;
 
-use bitvec::prelude::*;
 use exs::{
     knapsack::{read_knapsack, Params, Solution},
     open_file,
@@ -45,9 +42,9 @@ fn run(knapsack: &[Item], params: Params, pparams: PParams) -> (Duration, i32) {
             let random_index = rand.gen_range(0..knapsack.len());
             let s_prime = s.flip(random_index);
 
-            if s_prime < s {
+            if s_prime > s {
                 s = s_prime;
-                if s < s_best {
+                if s > s_best {
                     s_best = s.clone();
                 }
             } else if rand.gen::<f64>() < E.powf((s.value as f64 - s_prime.value as f64) / temp) {
@@ -64,7 +61,7 @@ fn run(knapsack: &[Item], params: Params, pparams: PParams) -> (Duration, i32) {
 
     let runtime = now.elapsed();
 
-    (runtime, s_best.value)
+    (runtime, s_best.total_value() as _)
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -74,8 +71,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pparams = PParams {
         epsilon: 0.005,
         i_max: 10,
-        temp0: 10.0,
-        alpha: 0.9,
+        temp0: 1000.0,
+        alpha: 0.9995,
         exponential_cooling: false,
         penalty: 2,
     };
@@ -86,7 +83,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     println!("{}", debug_to_kw(&pparams));
-    println!("runtime;cost");
+    println!("runtime;value");
     for _ in 0..10 {
         let (runtime, objective_func) = run(items, params, pparams);
         println!("{:?};{}", runtime.as_secs_f64(), objective_func);
