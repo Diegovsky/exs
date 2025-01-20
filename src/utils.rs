@@ -1,8 +1,4 @@
-use std::{
-    ffi::OsString,
-    fs::File,
-    io::{self, BufRead, BufReader},
-};
+use std::io::{self, BufRead};
 
 use crate::{Graph, Weight};
 
