@@ -50,23 +50,22 @@ pub struct Params {
     pub penalty: UWeight,
 }
 
-fn evaluate_solution(items: &BitVec, knapsack: &[Item], params: Params) -> Weight {
-    let total_val = items
-        .iter_ones()
-        .map(|index| knapsack[index].value)
-        .sum::<UWeight>();
-    let excess = items
-        .iter_ones()
-        .map(|index| knapsack[index].weight)
-        .sum::<UWeight>()
-        .saturating_sub(params.max_weight);
-    total_val as Weight - (params.penalty * excess) as Weight
-}
-
 impl<'ks> Solution<'ks> {
+    pub fn evaluate_solution(items: &BitVec, knapsack: &[Item], params: Params) -> Weight {
+        let total_val = items
+            .iter_ones()
+            .map(|index| knapsack[index].value)
+            .sum::<UWeight>();
+        let excess = items
+            .iter_ones()
+            .map(|index| knapsack[index].weight)
+            .sum::<UWeight>()
+            .saturating_sub(params.max_weight);
+        total_val as Weight - (params.penalty * excess) as Weight
+    }
     pub fn new(knapsack: &'ks [Item], items: BitVec, params: Params) -> Self {
         Self {
-            value: evaluate_solution(&items, knapsack, params),
+            value: Self::evaluate_solution(&items, knapsack, params),
             params,
             items,
             knapsack,
@@ -80,7 +79,7 @@ impl<'ks> Solution<'ks> {
         solution.resize(knapsack.len(), false);
         while let Some((i, _)) = sorted.pop() {
             solution.set(i, true);
-            if evaluate_solution(&solution, knapsack, params) < 0 {
+            if Self::evaluate_solution(&solution, knapsack, params) < 0 {
                 solution.set(i, false);
             }
         }
