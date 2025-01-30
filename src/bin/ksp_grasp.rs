@@ -22,7 +22,7 @@ fn random_greedy_solution<'g>(
     knapsack: &'g [Item],
     a: f64,
     rand: &mut impl rand::Rng,
-    params: Params,
+    params: WithPenalty,
 ) -> Solution<'g> {
     // solução inicial vazia
     let mut s = Solution::new(knapsack, bitvec![0; knapsack.len()], params);
@@ -74,7 +74,7 @@ fn greedy_search(s: &mut Solution) {
     }
 }
 
-fn run(knapsack: &[Item], pparams: PParams, params: Params) -> (Duration, UWeight) {
+fn run(knapsack: &[Item], pparams: PParams, params: WithPenalty) -> (Duration, UWeight) {
     let PParams {
         i_max, a, idle_max, ..
     } = pparams;
@@ -144,7 +144,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let params = Params {
+    let params = WithPenalty {
         max_weight: maxw,
         penalty: pparams.penalty as _,
     };

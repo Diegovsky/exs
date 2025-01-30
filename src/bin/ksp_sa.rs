@@ -5,7 +5,7 @@ use exs::debug_to_kw;
 use exs::knapsack::Item;
 
 use exs::{
-    knapsack::{read_knapsack, Params, Solution},
+    knapsack::{read_knapsack, Solution, WithPenalty},
     open_file,
 };
 use rand::Rng;
@@ -20,7 +20,7 @@ pub struct PParams {
     pub penalty: usize,
 }
 
-fn run(knapsack: &[Item], params: Params, pparams: PParams) -> (Duration, i32) {
+fn run(knapsack: &[Item], params: WithPenalty, pparams: PParams) -> (Duration, i32) {
     let PParams {
         i_max,
         epsilon,
@@ -77,7 +77,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         penalty: 2,
     };
 
-    let params = Params {
+    let params = WithPenalty {
         max_weight: maxw,
         penalty: pparams.penalty as _,
     };

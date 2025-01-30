@@ -36,54 +36,80 @@ pub fn read_knapsack(file: &mut dyn BufRead) -> std::io::Result<(UWeight, Vec<It
     ))
 }
 
-#[derive(Clone)]
-pub struct Solution<'ks> {
-    pub items: BitVec,
-    pub value: Weight,
-    pub knapsack: &'ks [Item],
-    pub params: Params,
+pub trait EvaluationMethod: Sized + Clone + Copy {
+    fn evaluate_solution(&self, solution: &Solution<'_, Self>) -> Weight;
+    fn max_weight(&self) -> UWeight;
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct Params {
+pub struct WithPenalty {
     pub max_weight: UWeight,
     pub penalty: UWeight,
 }
 
-impl<'ks> Solution<'ks> {
-    pub fn evaluate_solution(items: &BitVec, knapsack: &[Item], params: Params) -> Weight {
-        let total_val = items
-            .iter_ones()
-            .map(|index| knapsack[index].value)
-            .sum::<UWeight>();
-        let excess = items
-            .iter_ones()
-            .map(|index| knapsack[index].weight)
-            .sum::<UWeight>()
-            .saturating_sub(params.max_weight);
-        total_val as Weight - (params.penalty * excess) as Weight
+impl EvaluationMethod for WithPenalty {
+    fn evaluate_solution(&self, solution: &Solution<'_, Self>) -> Weight {
+        let total_val = solution.total_value();
+        let excess = solution.total_weight().saturating_sub(self.max_weight);
+        total_val as Weight - (self.penalty * excess) as Weight
     }
-    pub fn new(knapsack: &'ks [Item], items: BitVec, params: Params) -> Self {
-        Self {
-            value: Self::evaluate_solution(&items, knapsack, params),
-            params,
+    fn max_weight(&self) -> UWeight {
+        self.max_weight
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ByTotalValue {
+    pub max_weight: UWeight,
+}
+
+impl EvaluationMethod for ByTotalValue {
+    fn evaluate_solution(&self, solution: &Solution<'_, Self>) -> Weight {
+        solution.total_value() as Weight
+    }
+    fn max_weight(&self) -> UWeight {
+        self.max_weight
+    }
+}
+
+#[derive(Clone)]
+pub struct Solution<'ks, E: EvaluationMethod = WithPenalty> {
+    pub items: BitVec,
+    pub value: Weight,
+    pub knapsack: &'ks [Item],
+    pub eval_method: E,
+}
+
+impl<'ks, E> Solution<'ks, E>
+where
+    E: EvaluationMethod,
+{
+    pub fn new(knapsack: &'ks [Item], items: BitVec, eval_method: E) -> Self {
+        let mut this = Self {
+            value: 0,
+            eval_method,
             items,
             knapsack,
-        }
+        };
+        this.value = this.eval_method.evaluate_solution(&this);
+        this
     }
-    pub fn greedy(knapsack: &'ks [Item], params: Params) -> Self {
+    pub fn empty(knapsack: &'ks [Item], eval_method: E) -> Self {
+        Self::new(knapsack, bitvec::bitvec![0; knapsack.len()], eval_method)
+    }
+    pub fn greedy(knapsack: &'ks [Item], eval_method: E) -> Self {
+        let mut this = Self::empty(knapsack, eval_method);
+
         let mut sorted = knapsack.iter().enumerate().collect::<Vec<_>>();
         // ordena por valor do ítem
         sorted.sort_by_cached_key(|(_, item)| item.value);
-        let mut solution = BitVec::new();
-        solution.resize(knapsack.len(), false);
         while let Some((i, _)) = sorted.pop() {
-            solution.set(i, true);
-            if Self::evaluate_solution(&solution, knapsack, params) < 0 {
-                solution.set(i, false);
+            let new = this.flip(i);
+            if this < new {
+                this = new
             }
         }
-        Self::new(knapsack, solution, params)
+        this
     }
     pub fn total_value(&self) -> UWeight {
         self.items
@@ -101,7 +127,7 @@ impl<'ks> Solution<'ks> {
         let mut flipped = self.items.clone();
         let val = !flipped[index];
         flipped.set(index, val);
-        Self::new(self.knapsack, flipped, self.params)
+        Self::new(self.knapsack, flipped, self.eval_method)
     }
     pub fn best_neighbour(&self, taboos: &mut BitVec, best_value: Weight) -> Option<Self> {
         let mut current_best = None;
@@ -125,19 +151,19 @@ impl<'ks> Solution<'ks> {
     }
 }
 
-impl std::fmt::Debug for Solution<'_> {
+impl<E: EvaluationMethod> std::fmt::Debug for Solution<'_, E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:b}", self.items)
     }
 }
 
-impl std::cmp::PartialEq for Solution<'_> {
+impl<E: EvaluationMethod> std::cmp::PartialEq for Solution<'_, E> {
     fn eq(&self, other: &Self) -> bool {
         self.value.eq(&other.value)
     }
 }
 
-impl std::cmp::PartialOrd for Solution<'_> {
+impl<E: EvaluationMethod> std::cmp::PartialOrd for Solution<'_, E> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.value.partial_cmp(&other.value)
     }

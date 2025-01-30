@@ -1,4 +1,4 @@
-use exs::knapsack::{read_knapsack, Item, Params, Solution, UWeight};
+use exs::knapsack::{read_knapsack, Item, Solution, UWeight, WithPenalty};
 use exs::{debug_to_kw, open_file};
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
@@ -47,7 +47,7 @@ fn next_neighbour<'g>(
     best_neighbour
 }
 
-fn run(knapsack: &[Item], params: Params, pparams: PParams) -> (Duration, UWeight) {
+fn run(knapsack: &[Item], params: WithPenalty, pparams: PParams) -> (Duration, UWeight) {
     let PParams {
         i_max,
         tabu_memory,
@@ -131,7 +131,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //     penalty: 1,
     // };
 
-    let params = Params {
+    let params = WithPenalty {
         max_weight: maxw,
         penalty: pparams.penalty,
     };
