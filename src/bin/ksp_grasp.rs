@@ -41,13 +41,13 @@ fn random_greedy_solution<'g>(
             .collect_vec();
         // ordena por valor de g
         lrc.sort_unstable_by_key(|k| k.1);
-        let worst = lrc[0].1 as f64;
-        let best = lrc[lrc.len() - 1].1 as f64;
-        let cutoff = a * (best - worst) + worst;
+        let worst = lrc[0].1;
+        let best = lrc[lrc.len() - 1].1;
+        let cutoff = Weight::from(a) * (best - worst) + worst;
 
         // Remove candidatos cujo g não atende os parametros
         // nesse caso é >= pois é um problema de max
-        lrc.retain(|(_, weight)| *weight as f64 >= cutoff);
+        lrc.retain(|(_, weight)| *weight >= cutoff);
 
         // escolhe candidato aleatorialemente
         let (flipped, _) = lrc.choose_mut(rand).unwrap();
@@ -63,7 +63,7 @@ fn random_greedy_solution<'g>(
 fn greedy_search(s: &mut Solution) {
     let mut sorted = s.knapsack.iter().enumerate().collect::<Vec<_>>();
     // ordena por valor do ítem
-    sorted.sort_by_cached_key(|(_, item)| item.value);
+    sorted.sort_by(|(_, item), (_, item2)| item.value.total_cmp(&item2.value));
 
     while let Some((i, _)) = sorted.pop() {
         let s_prime = s.flip(i);
@@ -132,21 +132,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         PParams {
             i_max: 100,
             idle_max: 0,
-            penalty: 1,
+            penalty: 1.into(),
             a: 0.60,
         }
     } else {
         PParams {
             i_max: 0,
             idle_max: 80,
-            penalty: 2,
+            penalty: 2.into(),
             a: 0.20,
         }
     };
 
     let params = WithPenalty {
         max_weight: maxw,
-        penalty: pparams.penalty as _,
+        penalty: pparams.penalty.into(),
     };
 
     println!("{}", debug_to_kw(&pparams));

@@ -1,26 +1,61 @@
-use std::{
-    collections::{BTreeMap as Map, BTreeSet as Set},
-    fs::File,
-    io::BufReader,
-};
+use std::{fs::File, io::BufReader, ops::Range};
 
 pub mod knapsack;
 pub mod tsp;
 pub mod utils;
 
+pub type Set<T> = Vec<T>;
+
 /// Nós são identificados pelo tipo `u32`, que é um inteiro de 32 bits positivo.
 ///
 /// Equivale a um typedef em C++.
 pub type Node = u32;
-/// Definimos pesos das arestas como sendo inteiros de 32bits positivos.
-pub type Weight = u32;
+/// Definimos pesos das arestas como sendo float de 32bits.
+pub type Weight = ordered_float::OrderedFloat<f64>;
 /// Definimos nossas arestas como sendo uma tupla de dois nós e um peso.
-pub type Edge = (Node, Node, Weight);
+#[derive(Clone, Copy, Default, Debug)]
+pub struct Edge(pub Node, pub Node, pub Weight);
+
+impl Edge {
+    fn as_edge(self) -> (Node, Node) {
+        if self.1 > self.0 {
+            (self.1, self.0)
+        } else {
+            (self.0, self.1)
+        }
+    }
+}
+
+impl PartialEq for Edge {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_edge().eq(&other.as_edge())
+    }
+}
+
+impl Eq for Edge {}
+
+impl PartialOrd for Edge {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.as_edge().partial_cmp(&other.as_edge())
+    }
+}
+
+impl Ord for Edge {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.as_edge().cmp(&other.as_edge())
+    }
+}
 
 /// Um `trait` que define os métodos que todo grafo deve implementar.
 ///
 /// `Trait`s são análogos a classes abstratas em C++, ou interfaces em outras linguagens
 pub trait Graph {
+    fn add_nodes(&mut self, node_count: usize) -> Vec<Node> {
+        (0..node_count)
+            .into_iter()
+            .map(|_| self.add_node())
+            .collect()
+    }
     fn add_node(&mut self) -> Node;
     fn add_edge(&mut self, a: Node, b: Node, weight: Weight);
     fn edges(&self) -> Set<Edge>;
@@ -28,58 +63,26 @@ pub trait Graph {
 
     //
     fn get_node_edges(&self, a: Node) -> Set<Edge>;
-
-    fn get_edge_weight(&self, a: Node, b: Node) -> Option<Weight>;
-}
-
-/// Struct que representa um grafo implementado por meio de lista de adjacência.
-///
-/// A diretiva `derive` implementa traits (interfaces) automaticamente, sendo eles:
-///     - Default: Permite a inicialização com valores padrões para todos os campos
-///     - Debug: Mostra o tipo e seus campos de forma intuitiva para debug
-///     - Clone: Permite criar cópias da struct.
-#[derive(Default, Debug, Clone)]
-pub struct GraphAdj {
-    next_node: Node,
-    node_edges: Map<Node, Vec<Edge>>,
-}
-
-impl Graph for GraphAdj {
-    fn edges(&self) -> Set<Edge> {
-        self.node_edges.values().flatten().copied().collect()
-    }
-    fn add_node(&mut self) -> Node {
-        let node = self.next_node;
-        self.node_edges.insert(node, vec![]);
-
-        self.next_node += 1;
-        node
-    }
-    fn node_count(&self) -> usize {
-        self.node_edges.len()
-    }
-    fn add_edge(&mut self, a: Node, b: Node, weight: Weight) {
-        for (a, b) in [(a, b), (b, a)] {
-            let a_edges = self
-                .node_edges
-                .get_mut(&a)
-                .unwrap_or_else(|| panic!("Tried to add edge to inexistent node {a}"));
-            match a_edges.iter_mut().find(|e| e.1 == b) {
-                Some(existing_edge) => existing_edge.2 = weight,
-                None => a_edges.push((a, b, weight)),
-            }
-        }
-    }
-
-    fn get_node_edges(&self, a: Node) -> Set<Edge> {
-        self.node_edges[&a].iter().copied().collect()
-    }
-
+    fn get_edge_weight_ref(&self, a: Node, b: Node) -> Option<&Weight>;
+    fn get_edge_weight_mut(&mut self, a: Node, b: Node) -> Option<&mut Weight>;
     fn get_edge_weight(&self, a: Node, b: Node) -> Option<Weight> {
-        self.node_edges[&a]
-            .iter()
-            .find(|(_, neighbour, _)| *neighbour == b)
-            .map(|(_, _, w)| *w)
+        self.get_edge_weight_ref(a, b).copied()
+    }
+    fn nodes(&self) -> Range<Node> {
+        0..(self.node_count() as Node)
+    }
+}
+
+impl std::ops::Index<(Node, Node)> for dyn Graph + '_ {
+    type Output = Weight;
+    fn index(&self, (a, b): (Node, Node)) -> &Self::Output {
+        self.get_edge_weight_ref(a, b).unwrap()
+    }
+}
+
+impl std::ops::IndexMut<(Node, Node)> for dyn Graph + '_ {
+    fn index_mut(&mut self, (a, b): (Node, Node)) -> &mut Self::Output {
+        self.get_edge_weight_mut(a, b).unwrap()
     }
 }
 
@@ -96,7 +99,7 @@ impl Graph for GraphMat {
 
         let new_node_count = self.node_count + 1;
         // Cria novo vetor cujo tamanho é `(node_count+1) ^ 2`
-        let mut new_links = vec![0; new_node_count.pow(2)];
+        let mut new_links = vec![0.into(); new_node_count.pow(2)];
 
         // Caso haja nós no vetor, precisamos copiar as informações para o novo.
         if self.node_count > 0 {
@@ -121,10 +124,20 @@ impl Graph for GraphMat {
     fn node_count(&self) -> usize {
         self.node_count
     }
-    fn get_edge_weight(&self, a: Node, b: Node) -> Option<Weight> {
+    fn get_edge_weight_ref(&self, a: Node, b: Node) -> Option<&Weight> {
         let idx = a as usize * self.node_count + b as usize;
-        let w = *self.links.get(idx)?;
-        if w == 0 {
+        let w = self.links.get(idx)?;
+        if *w == 0.0 {
+            None
+        } else {
+            Some(w)
+        }
+    }
+
+    fn get_edge_weight_mut(&mut self, a: Node, b: Node) -> Option<&mut Weight> {
+        let idx = a as usize * self.node_count + b as usize;
+        let w = self.links.get_mut(idx)?;
+        if *w == 0.0 {
             None
         } else {
             Some(w)
@@ -138,12 +151,12 @@ impl Graph for GraphMat {
             // Adicionamos um contador à cada elemento
             .enumerate()
             // Filtra links cujo peso é 0
-            .filter(|(_, weight)| *weight > 0)
+            .filter(|(_, weight)| *weight > 0.0.into())
             // Transforma uma tupla de posição e peso em `Edge`.
             .map(|(i, weight)| {
                 let y = i / self.node_count;
                 let x = i % self.node_count;
-                (x as Node, y as Node, weight)
+                Edge(x as Node, y as Node, weight)
             })
             .collect()
     }
@@ -162,8 +175,8 @@ impl Graph for GraphMat {
         self.links[(a * self.node_count)..((a + 1) * self.node_count)]
             .iter()
             .enumerate()
-            .filter(|(_, w)| **w != 0)
-            .map(|(b, w)| (a as Node, b as Node, *w))
+            .filter(|(_, w)| **w != 0.0)
+            .map(|(b, w)| Edge(a as Node, b as Node, *w))
             .collect()
     }
 }
@@ -201,7 +214,7 @@ pub fn fill_graph(input_data: &[Vec<u32>], graph: &mut dyn Graph) {
         //
         // Como dito anteriormente, os nós são crescentes e começam em 0, portanto, precisamos
         // subtrair 1 dos identificadores das entradas.
-        graph.add_edge(a - 1, b - 1, weight);
+        graph.add_edge(a - 1, b - 1, weight.into());
     }
 }
 

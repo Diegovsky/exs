@@ -35,13 +35,13 @@ fn random_greedy_solution<'g>(g: &'g dyn Graph, a: f64, rand: &mut impl rand::Rn
             .collect_vec();
         // ordena por valor de g
         lrc.sort_unstable_by_key(|k| k.1);
-        let worst = lrc[0].1 as f64;
-        let best = lrc[lrc.len() - 1].1 as f64;
-        let cutoff = a * (best - worst) + worst;
+        let worst = lrc[0].1;
+        let best = lrc[lrc.len() - 1].1;
+        let cutoff = Weight::from(a) * (best - worst) + worst;
 
         // Remove candidatos cujo g não atende os parametros
         // nesse caso é <= pois é um problema de min
-        lrc.retain(|(_, weight)| *weight as f64 <= cutoff);
+        lrc.retain(|(_, weight)| *weight <= cutoff);
 
         // escolhe candidato aleatorialemente
         let &(node, _) = lrc.choose(rand).unwrap();

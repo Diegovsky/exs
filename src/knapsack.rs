@@ -1,7 +1,7 @@
-use std::io::BufRead;
+use std::{io::BufRead, ops::Sub};
 
 pub use crate::Weight as UWeight;
-pub type Weight = i32;
+pub type Weight = UWeight;
 
 use bitvec::vec::BitVec;
 
@@ -50,8 +50,8 @@ pub struct WithPenalty {
 impl EvaluationMethod for WithPenalty {
     fn evaluate_solution(&self, solution: &Solution<'_, Self>) -> Weight {
         let total_val = solution.total_value();
-        let excess = solution.total_weight().saturating_sub(self.max_weight);
-        total_val as Weight - (self.penalty * excess) as Weight
+        let excess = solution.total_weight().sub(self.max_weight).max(0.into());
+        (total_val - (self.penalty * excess))
     }
     fn max_weight(&self) -> UWeight {
         self.max_weight
@@ -65,7 +65,7 @@ pub struct ByTotalValue {
 
 impl EvaluationMethod for ByTotalValue {
     fn evaluate_solution(&self, solution: &Solution<'_, Self>) -> Weight {
-        solution.total_value() as Weight
+        solution.total_value()
     }
     fn max_weight(&self) -> UWeight {
         self.max_weight
@@ -86,7 +86,7 @@ where
 {
     pub fn new(knapsack: &'ks [Item], items: BitVec, eval_method: E) -> Self {
         let mut this = Self {
-            value: 0,
+            value: 0.0.into(),
             eval_method,
             items,
             knapsack,
@@ -102,7 +102,7 @@ where
 
         let mut sorted = knapsack.iter().enumerate().collect::<Vec<_>>();
         // ordena por valor do ítem
-        sorted.sort_by_cached_key(|(_, item)| item.value);
+        sorted.sort_by(|(_, item), (_, item2)| item.value.total_cmp(&item2.value));
         while let Some((i, _)) = sorted.pop() {
             let new = this.flip(i);
             if this < new {

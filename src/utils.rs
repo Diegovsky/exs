@@ -1,13 +1,16 @@
-use std::io::{self, BufRead};
+use std::{
+    io::{self, BufRead},
+    ops::Sub,
+};
 
 use crate::{Graph, Weight};
 
 pub fn euclidean_distance(a: [Weight; 2], b: [Weight; 2]) -> Weight {
-    let xd = a[0].abs_diff(b[0]);
-    let yd = a[1].abs_diff(b[1]);
-    let d = (xd.pow(2) + yd.pow(2)) as f64;
+    let xd = a[0].sub(b[0]).abs();
+    let yd = a[1].sub(b[1]).abs();
+    let d = (xd.powi(2) + yd.powi(2)) as f64;
     let d = d.sqrt() + 0.5;
-    d as Weight
+    d.into()
 }
 
 pub fn fill_tsp_graph(file: &mut dyn BufRead, graph: &mut dyn Graph) -> io::Result<()> {

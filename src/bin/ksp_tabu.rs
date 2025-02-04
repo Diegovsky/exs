@@ -121,7 +121,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         i_max: 5000,
         tabu_memory: 50,
         idle_max: 0,
-        penalty: 3,
+        penalty: 3.into(),
     };
 
     // let pparams = PParams {

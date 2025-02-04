@@ -2,7 +2,7 @@ use std::f64::consts::E;
 use std::time::{Duration, Instant};
 
 use exs::debug_to_kw;
-use exs::knapsack::Item;
+use exs::knapsack::{Item, Weight};
 
 use exs::{
     knapsack::{read_knapsack, Solution, WithPenalty},
@@ -17,10 +17,10 @@ pub struct PParams {
     pub alpha: f64,
     pub temp0: f64,
     pub exponential_cooling: bool,
-    pub penalty: usize,
+    pub penalty: Weight,
 }
 
-fn run(knapsack: &[Item], params: WithPenalty, pparams: PParams) -> (Duration, i32) {
+fn run(knapsack: &[Item], params: WithPenalty, pparams: PParams) -> (Duration, Weight) {
     let PParams {
         i_max,
         epsilon,
@@ -47,7 +47,7 @@ fn run(knapsack: &[Item], params: WithPenalty, pparams: PParams) -> (Duration, i
                 if s > s_best {
                     s_best = s.clone();
                 }
-            } else if rand.gen::<f64>() < E.powf((s.value as f64 - s_prime.value as f64) / temp) {
+            } else if rand.gen::<f64>() < E.powf(*(s.value - s_prime.value) / temp) {
                 s = s_prime;
             }
         }
@@ -61,7 +61,7 @@ fn run(knapsack: &[Item], params: WithPenalty, pparams: PParams) -> (Duration, i
 
     let runtime = now.elapsed();
 
-    (runtime, s_best.total_value() as _)
+    (runtime, s_best.total_value())
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -74,12 +74,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         temp0: 1000.0,
         alpha: 0.9995,
         exponential_cooling: false,
-        penalty: 2,
+        penalty: 2.into(),
     };
 
     let params = WithPenalty {
         max_weight: maxw,
-        penalty: pparams.penalty as _,
+        penalty: pparams.penalty,
     };
 
     println!("{}", debug_to_kw(&pparams));

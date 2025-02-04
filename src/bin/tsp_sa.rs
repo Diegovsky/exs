@@ -39,7 +39,7 @@ fn run(g: &dyn Graph, params: &Params) -> (Duration, Weight) {
                 if s < s_best {
                     s_best = s.clone();
                 }
-            } else if rand.gen::<f64>() < E.powf((s.value as f64 - s_prime.value as f64) / temp) {
+            } else if rand.gen::<f64>() < E.powf((s.value - s_prime.value).0 / temp) {
                 s = s_prime;
             }
         }
