@@ -23,6 +23,13 @@ impl std::cmp::PartialOrd for Solution<'_> {
         self.value.partial_cmp(&other.value)
     }
 }
+impl std::cmp::Eq for Solution<'_> {}
+
+impl std::cmp::Ord for Solution<'_> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.value.cmp(&other.value)
+    }
+}
 
 // Função de avaliação
 fn solution_value(solution: &[Node], g: &dyn Graph) -> Weight {
