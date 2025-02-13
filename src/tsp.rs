@@ -7,7 +7,7 @@ pub type NodeList = Box<[Node]>;
 pub struct Solution<'g> {
     pub nodes: NodeList,
     pub value: Weight,
-    graph: &'g dyn Graph,
+    pub graph: &'g dyn Graph,
 }
 
 // Implementa interfaces de comparação
@@ -50,6 +50,9 @@ impl<'g> Solution<'g> {
             nodes: nodes.into(),
             graph,
         }
+    }
+    pub fn reeval(&mut self) {
+        self.value = solution_value(&self.nodes, self.graph)
     }
 
     pub fn sequential(g: &'g dyn Graph) -> Self {

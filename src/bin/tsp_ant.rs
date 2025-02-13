@@ -1,10 +1,7 @@
 use exs::tsp::Solution;
 use exs::{debug_to_kw, open_file, Edge, Graph, GraphMat, Node, Weight};
-use itertools::Itertools;
 use rand::prelude::Distribution;
-use rand::seq::SliceRandom;
 use rand::Rng;
-use std::f64::consts::E;
 use std::time::{Duration, Instant};
 
 #[derive(Debug)]
@@ -102,16 +99,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     exs::utils::fill_tsp_graph(&mut file, &mut graph)?;
 
     let params = Params {
-        i_max: 100,
+        i_max: 60,
         alpha: 1.0,
         beta: 2.5,
         evap: 0.1,
         tau0: 1.0,
-        reinforcement: 1.0,
+        reinforcement: 10.0,
         ant_count: graph.node_count(),
     };
 
-    let (runtime, objective_func) = run(&graph, &params);
-    println!("{:?}\n{}", runtime.as_secs_f64(), objective_func);
+    println!("{}", debug_to_kw(&params));
+    for _ in 0..10 {
+        let (runtime, objective_func) = run(&graph, &params);
+        println!("{:?};{}", runtime.as_secs_f64(), objective_func);
+    }
     Ok(())
 }

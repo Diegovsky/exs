@@ -4,6 +4,7 @@ pub use crate::Weight as UWeight;
 pub type Weight = UWeight;
 
 use bitvec::vec::BitVec;
+use rand::Rng;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Item {
@@ -91,11 +92,25 @@ where
             items,
             knapsack,
         };
-        this.value = this.eval_method.evaluate_solution(&this);
+        this.reeval();
         this
+    }
+    pub fn reeval(&mut self) {
+        self.value = self.eval_method.evaluate_solution(&self);
     }
     pub fn empty(knapsack: &'ks [Item], eval_method: E) -> Self {
         Self::new(knapsack, bitvec::bitvec![0; knapsack.len()], eval_method)
+    }
+    pub fn random(knapsack: &'ks [Item], eval_method: E) -> Self {
+        let mut rng = rand::thread_rng();
+        Self::new(
+            knapsack,
+            (0..knapsack.len())
+                .into_iter()
+                .map(|_| rng.gen::<bool>())
+                .collect(),
+            eval_method,
+        )
     }
     pub fn greedy(knapsack: &'ks [Item], eval_method: E) -> Self {
         let mut this = Self::empty(knapsack, eval_method);

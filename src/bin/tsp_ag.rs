@@ -1,90 +1,85 @@
 use exs::tsp::Solution;
-use exs::{debug_to_kw, open_file, Edge, Graph, GraphMat, Node, Weight};
-use itertools::Itertools;
-use rand::prelude::Distribution;
-use rand::seq::SliceRandom;
-use rand::Rng;
-use std::f64::consts::E;
+use exs::{debug_to_kw, open_file, Graph, GraphMat};
+use rand::prelude::*;
 use std::time::{Duration, Instant};
 
-#[derive(Debug)]
-pub struct Params {
-    pub i_max: usize,
-    pub alpha: f64,
-    pub beta: f64,
-    pub evap: f64,
-    pub reinforcement: f64,
-    pub ant_count: usize,
+#[derive(Debug, Clone, Copy)]
+pub struct GAParams {
+    pub population_size: usize,
+    pub generations: usize,
+    pub mutation_rate: f64,
 }
 
-fn remove_random(
-    i: Node,
-    s: &mut Vec<Node>,
-    rand: &mut impl Rng,
-    g: &dyn Graph,
-    pheromones: &dyn Graph,
-    params: &Params,
-) -> Node {
-    let distributions = s
+fn initialize_population<'g>(graph: &'g dyn Graph, size: usize) -> Vec<Solution<'g>> {
+    (0..size).map(|_| Solution::random(graph)).collect()
+}
+
+fn selection<'pops, 'g>(population: &'pops [Solution<'g>]) -> &'pops Solution<'g> {
+    let weights: Vec<_> = population
         .iter()
-        .map(|k| (pheromones[(i, *k)]).powf(params.alpha) * (g[(i, *k)].recip()).powf(params.beta));
-    let k_index = rand::distributions::WeightedIndex::new(distributions)
-        .unwrap()
-        .sample(rand);
-    s.remove(k_index)
+        .map(|s| (10000.0 * s.value.into_inner()).recip())
+        .collect();
+    let dist = rand::distributions::WeightedIndex::new(&weights).unwrap();
+    let mut rng = thread_rng();
+    &population[dist.sample(&mut rng)]
 }
 
-fn ant_path<'g>(g: &'g dyn Graph, pheromones: &dyn Graph, params: &Params) -> Solution<'g> {
-    let mut rand = rand::thread_rng();
-    let mut s = (0..g.node_count() as Node).into_iter().collect::<Vec<_>>();
-    let mut path = Vec::<Node>::new();
-
-    // Escolhe cidade inicial aleatoriamente
-    let mut i = s.remove(rand.gen_range(0..s.len()));
-    path.push(i);
-    while !s.is_empty() {
-        let j = remove_random(i, &mut s, &mut rand, g, pheromones, params);
-        path.push(j);
-        i = j;
-    }
-    todo!()
+fn crossover<'g>(parent1: &Solution<'g>, parent2: &Solution<'g>) -> Solution<'g> {
+    let mut rng = thread_rng();
+    let point = rng.gen_range(1..parent1.nodes.len() - 1);
+    let mut child_nodes = parent1.nodes[..point].to_vec();
+    child_nodes.extend(
+        parent2
+            .nodes
+            .iter()
+            .filter(|&n| !child_nodes.contains(n))
+            .collect::<Vec<_>>(),
+    );
+    Solution::new(child_nodes, parent1.graph)
 }
 
-fn run(g: &dyn Graph, params: &Params) -> (Duration, Weight) {
-    let mut pheromones = GraphMat::default();
-    pheromones.add_nodes(g.node_count());
-    for Edge(u, v, _) in g.edges() {
-        // feromonio inicial
-        pheromones.add_edge(u, v, 1.into());
+fn mutate<'g>(solution: &mut Solution<'g>, rate: f64) {
+    let mut rng = thread_rng();
+    if rng.gen::<f64>() < rate {
+        let (i, j) = {
+            let len = solution.nodes.len();
+            let a = rng.gen_range(0..len);
+            let mut b = rng.gen_range(0..len);
+            while a == b {
+                b = rng.gen_range(0..len);
+            }
+            (a, b)
+        };
+        solution.nodes.swap(i, j);
+        solution.reeval();
+    }
+}
+
+fn run<'g>(graph: &'g dyn Graph, params: GAParams) -> (Duration, f64) {
+    let GAParams {
+        population_size,
+        generations,
+        mutation_rate,
+    } = params;
+
+    let mut population = initialize_population(graph, population_size);
+    let now = Instant::now();
+
+    for _ in 0..generations {
+        let mut new_population = Vec::with_capacity(population_size);
+        while new_population.len() < population_size {
+            let parent1 = selection(&population);
+            let parent2 = selection(&population);
+            let mut offspring = crossover(parent1, parent2);
+            mutate(&mut offspring, mutation_rate);
+            new_population.push(offspring);
+        }
+        population = new_population;
     }
 
-    let mut pheromones: &mut dyn Graph = &mut pheromones;
-
-    for _ in 0..params.i_max {
-        // Escolhe melhor formiga
-        let best = (0..params.ant_count)
-            .into_iter()
-            .map(|_| ant_path(g, pheromones, params))
-            .max_by(|s1, s2| s1.value.total_cmp(&s2.value))
-            .unwrap();
-
-        // Evaporação
-        for Edge(u, v, w) in pheromones.edges() {
-            let new_weight = (Weight::from(1.0 - params.evap) * w).into();
-            pheromones[(u, v)] = new_weight;
-        }
-
-        // Atualização das trilhas
-        let n = best.nodes.len() as Node;
-        let components = (0..n - 1)
-            .into_iter()
-            .map(|i| (i, i + 1))
-            .chain(Some((n - 1, 0)));
-        for (i, j) in components {
-            pheromones[(i, j)] += Weight::from(params.reinforcement) / (best.value);
-        }
-    }
-    todo!()
+    let best_solution = population.into_iter().min().unwrap();
+    let runtime = now.elapsed();
+    (runtime, best_solution.value.0)
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -92,16 +87,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut graph = GraphMat::default();
     exs::utils::fill_tsp_graph(&mut file, &mut graph)?;
 
-    let params = Params {
-        i_max: 10,
-        alpha: 1.0,
-        beta: 1.0,
-        evap: 0.05,
-        reinforcement: 1.0,
-        ant_count: graph.node_count(),
+    let params = GAParams {
+        population_size: 200,
+        generations: 20,
+        mutation_rate: 0.05,
     };
 
-    let (runtime, objective_func) = run(&graph, &params);
-    println!("{:?}\n{}", runtime.as_secs_f64(), objective_func);
+    println!("{}", debug_to_kw(&params));
+    println!("runtime;value");
+    for _ in 0..10 {
+        let (runtime, objective_func) = run(&graph, params);
+        println!("{:?};{}", runtime.as_secs_f64(), objective_func);
+    }
     Ok(())
 }
